@@ -1,7 +1,7 @@
 # SVM
 
 Stack based virtual machine implemented in rust.\
-It only supports integers as a data type and basic arithmetic, loops, conditionals and functions.\
+It supports integers as a data type and basic arithmetic, loops, conditionals and functions.
 
 ## Examples
 
