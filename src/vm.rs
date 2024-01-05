@@ -109,7 +109,11 @@ impl Vm {
 
                     self.ip = return_dddress;
                 }
-
+                Instruction::Write => {
+                    if let Some(v) = self.stack.front() {
+                        print!("{:?}", v);
+                    }
+                }
                 Instruction::Add
                 | Instruction::Div
                 | Instruction::Mul
@@ -151,6 +155,7 @@ impl Vm {
             | Instruction::Load
             | Instruction::Store
             | Instruction::Call
+            | Instruction::Write
             | Instruction::Ret => panic!("Not a binary op"),
         }
     }
@@ -561,5 +566,14 @@ mod test {
         assert!(vm.halted);
         assert_eq!(vm.ip, 7);
         assert_eq!(vm.stack, stack![num!(6)]);
+    }
+
+    #[test]
+    // Run the test with --nocapture to see the output.
+    fn test_write_stdout() {
+        let mut vm = Vm::new(vec![PUSH, num!(3), WRITE, HALT]);
+        vm.run();
+        assert!(vm.halted);
+        assert_eq!(vm.ip, 4);
     }
 }

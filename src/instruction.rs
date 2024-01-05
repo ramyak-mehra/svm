@@ -22,7 +22,8 @@ pub enum Instruction {
 
     Ret,
     Call,
-    // Write,
+
+    Write,
 }
 
 pub type Operand = i64;
