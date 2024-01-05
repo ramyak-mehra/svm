@@ -27,20 +27,20 @@ pub enum Instruction {
 
 pub type Operand = i64;
 #[derive(Debug, PartialEq, Eq, Clone)]
-pub enum Value {
+pub enum Token {
     Instruction(Instruction),
     Data(Operand),
 }
 
-impl Value {
+impl Token {
     pub fn get_data(&self) -> Result<Operand, &str> {
         match self {
-            Value::Instruction(_) => Err(""),
-            Value::Data(d) => Ok(*d),
+            Token::Instruction(_) => Err(""),
+            Token::Data(d) => Ok(*d),
         }
     }
-    pub fn number(d: Operand) -> Value {
-        Value::Data(d)
+    pub fn number(d: Operand) -> Token {
+        Token::Data(d)
     }
 
     pub fn to_bool(d: Operand) -> bool {
@@ -48,15 +48,15 @@ impl Value {
     }
     pub fn vto_bool(&self) -> Result<bool, &str> {
         match self {
-            Value::Instruction(_) => Err(""),
-            Value::Data(d) => Ok(d != &0),
+            Token::Instruction(_) => Err(""),
+            Token::Data(d) => Ok(d != &0),
         }
     }
 
-    pub fn v_true() -> Value {
-        Value::Data(1)
+    pub fn v_true() -> Token {
+        Token::Data(1)
     }
-    pub fn v_false() -> Value {
-        Value::Data(0)
+    pub fn v_false() -> Token {
+        Token::Data(0)
     }
 }

@@ -1,7 +1,7 @@
 #[macro_export]
 macro_rules! num {
     ($x:literal) => {
-        Value::number($x)
+        Token::number($x)
     };
 }
 

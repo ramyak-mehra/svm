@@ -14,7 +14,7 @@ fn impl_instruction_macro(ast: &syn::DeriveInput) -> TokenStream {
     if let syn::Data::Enum(e) = &ast.data {
         for v in &e.variants {
             let v = format!(
-                "pub const {}: Value = Value::{}({}::{});",
+                "pub const {}: Token = Token::{}({}::{});",
                 v.ident.to_string().to_uppercase(),
                 ast.ident,
                 ast.ident,

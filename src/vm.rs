@@ -4,13 +4,13 @@ use std::{collections::VecDeque, default};
 struct Vm {
     halted: bool,
     ip: usize, //Instruction Pointer
-    stack: VecDeque<Value>,
-    program: Vec<Value>,
+    stack: VecDeque<Token>,
+    program: Vec<Token>,
     frames: VecDeque<Frame>,
 }
 
 impl Vm {
-    pub fn new(program: Vec<Value>) -> Self {
+    pub fn new(program: Vec<Token>) -> Self {
         Self {
             halted: false,
             ip: 0,
@@ -39,17 +39,17 @@ impl Vm {
     }
 
     fn execute(&mut self) {
-        let value = self.nextValue();
+        let value = self.nextToken();
         match value {
-            Value::Instruction(i) => match i {
+            Token::Instruction(i) => match i {
                 Instruction::Halt => self.halted = true,
                 Instruction::Pop => {
                     assert!(self.stack.len() >= 1);
                     self.stack.pop_front();
                 }
                 Instruction::Push => {
-                    let v = self.nextValue().get_data().unwrap();
-                    self.stack.push_front(Value::Data(v));
+                    let v = self.nextToken().get_data().unwrap();
+                    self.stack.push_front(Token::Data(v));
                 }
                 Instruction::Dup => {
                     assert!(self.stack.len() >= 1);
@@ -58,13 +58,13 @@ impl Vm {
                     self.stack.push_front(v);
                 }
                 Instruction::Jmp => {
-                    let v = self.nextValue().get_data().unwrap();
+                    let v = self.nextToken().get_data().unwrap();
                     self.ip = v as usize;
                 }
                 Instruction::Jif => {
                     assert!(self.stack.len() >= 1);
                     let c = self.stack.pop_front().unwrap().vto_bool().unwrap();
-                    let d1 = self.nextValue().get_data().unwrap();
+                    let d1 = self.nextToken().get_data().unwrap();
 
                     if c {
                         self.ip = d1 as usize;
@@ -75,27 +75,27 @@ impl Vm {
                     assert!(self.stack.len() >= 1);
                     let v1 = self.stack.pop_front().unwrap().vto_bool().unwrap();
                     let r = match v1 {
-                        true => Value::v_false(),
-                        false => Value::v_true(),
+                        true => Token::v_false(),
+                        false => Token::v_true(),
                     };
                     self.stack.push_front(r);
                 }
                 Instruction::Load => {
-                    let v1 = self.nextValue().get_data().unwrap();
+                    let v1 = self.nextToken().get_data().unwrap();
                     let var = self.current_frame().get(v1);
 
-                    self.stack.push_front(Value::Data(var));
+                    self.stack.push_front(Token::Data(var));
                 }
 
                 Instruction::Store => {
                     assert!(self.stack.len() >= 1);
-                    let var = self.nextValue().get_data().unwrap();
+                    let var = self.nextToken().get_data().unwrap();
                     let val = self.stack.pop_front().unwrap().get_data().unwrap();
                     self.current_frame_mut().set(var, val);
                 }
 
                 Instruction::Call => {
-                    let address = self.nextValue().get_data().unwrap();
+                    let address = self.nextToken().get_data().unwrap();
                     assert!(address > 0 && address < self.program.len().try_into().unwrap());
                     self.frames.push_front(Frame::new(self.ip));
 
@@ -123,10 +123,10 @@ impl Vm {
                     let d1 = self.stack.pop_front().unwrap().get_data().unwrap();
                     let d2 = self.stack.pop_front().unwrap().get_data().unwrap();
                     let r = Vm::execute_binary(i, d2, d1);
-                    self.stack.push_front(Value::Data(r));
+                    self.stack.push_front(Token::Data(r));
                 }
             },
-            Value::Data(_) => panic!("Cannot execute on data"),
+            Token::Data(_) => panic!("Cannot execute on data"),
         }
     }
 
@@ -136,8 +136,8 @@ impl Vm {
             Instruction::Sub => d1 - d2,
             Instruction::Mul => d1 * d2,
             Instruction::Div => d1 / d2,
-            Instruction::And => (Value::to_bool(d1) && Value::to_bool(d2)).into(),
-            Instruction::Or => (Value::to_bool(d1) || Value::to_bool(d2)).into(),
+            Instruction::And => (Token::to_bool(d1) && Token::to_bool(d2)).into(),
+            Instruction::Or => (Token::to_bool(d1) || Token::to_bool(d2)).into(),
             Instruction::Isgt => (d1 > d2).into(),
             Instruction::Isge => (d1 >= d2).into(),
             Instruction::Iseq => (d1 == d2).into(),
@@ -155,7 +155,7 @@ impl Vm {
         }
     }
 
-    fn nextValue(&mut self) -> Value {
+    fn nextToken(&mut self) -> Token {
         if self.ip >= self.program.len() {
             panic!("IP out of bounds")
         }
