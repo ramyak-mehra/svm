@@ -57,7 +57,7 @@ impl Vm {
                     self.stack.push_front(v.clone());
                     self.stack.push_front(v);
                 }
-                Instruction::Jump => {
+                Instruction::Jmp => {
                     let v = self.nextValue().get_data().unwrap();
                     self.ip = v as usize;
                 }
@@ -111,7 +111,7 @@ impl Vm {
                 }
 
                 Instruction::Add
-                | Instruction::Divide
+                | Instruction::Div
                 | Instruction::Mul
                 | Instruction::Sub
                 | Instruction::And
@@ -135,7 +135,7 @@ impl Vm {
             Instruction::Add => d1 + d2,
             Instruction::Sub => d1 - d2,
             Instruction::Mul => d1 * d2,
-            Instruction::Divide => d1 / d2,
+            Instruction::Div => d1 / d2,
             Instruction::And => (Value::to_bool(d1) && Value::to_bool(d2)).into(),
             Instruction::Or => (Value::to_bool(d1) || Value::to_bool(d2)).into(),
             Instruction::Isgt => (d1 > d2).into(),
@@ -146,7 +146,7 @@ impl Vm {
             | Instruction::Pop
             | Instruction::Push
             | Instruction::Jif
-            | Instruction::Jump
+            | Instruction::Jmp
             | Instruction::Not
             | Instruction::Load
             | Instruction::Store

@@ -1,32 +1,4 @@
-pub const HALT: Value = Value::Instruction(Instruction::Halt);
-
-pub const POP: Value = Value::Instruction(Instruction::Pop);
-pub const PUSH: Value = Value::Instruction(Instruction::Push);
-pub const DUP: Value = Value::Instruction(Instruction::Dup);
-
-pub const ADD: Value = Value::Instruction(Instruction::Add);
-pub const SUB: Value = Value::Instruction(Instruction::Sub);
-pub const MUL: Value = Value::Instruction(Instruction::Mul);
-pub const DIV: Value = Value::Instruction(Instruction::Divide);
-
-pub const NOT: Value = Value::Instruction(Instruction::Not);
-pub const AND: Value = Value::Instruction(Instruction::And);
-pub const OR: Value = Value::Instruction(Instruction::Or);
-
-pub const ISEQ: Value = Value::Instruction(Instruction::Iseq);
-pub const ISGT: Value = Value::Instruction(Instruction::Isgt);
-pub const ISGE: Value = Value::Instruction(Instruction::Isge);
-
-pub const JMP: Value = Value::Instruction(Instruction::Jump);
-pub const JIF: Value = Value::Instruction(Instruction::Jif);
-
-pub const LOAD: Value = Value::Instruction(Instruction::Load);
-pub const STORE: Value = Value::Instruction(Instruction::Store);
-
-pub const RET: Value = Value::Instruction(Instruction::Ret);
-pub const CALL: Value = Value::Instruction(Instruction::Call);
-
-#[derive(Debug, PartialEq, Eq, Clone)]
+#[derive(Debug, PartialEq, Eq, Clone, instruction::Instruction)]
 pub enum Instruction {
     Halt,
     Push,
@@ -35,14 +7,14 @@ pub enum Instruction {
     Add,
     Sub,
     Mul,
-    Divide,
+    Div,
     Not,
     And,
     Or,
     Iseq,
     Isgt,
     Isge,
-    Jump,
+    Jmp,
     Jif,
 
     Load,
@@ -50,10 +22,10 @@ pub enum Instruction {
 
     Ret,
     Call,
+    // Write,
 }
 
 pub type Operand = i64;
-
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum Value {
     Instruction(Instruction),
