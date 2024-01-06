@@ -1,5 +1,3 @@
-#![feature(log_syntax)]
-
 use proc_macro::{self, TokenStream};
 use syn;
 

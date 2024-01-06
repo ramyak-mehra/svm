@@ -1,4 +1,4 @@
 mod frame;
-mod instruction;
+pub mod token;
 mod utils;
 mod vm;

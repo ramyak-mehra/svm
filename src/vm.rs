@@ -1,4 +1,9 @@
-use crate::{frame::Frame, instruction::*, stack};
+use crate::{
+    data,
+    frame::Frame,
+    int, stack, tbool,
+    token::{instruction::Instruction, operand::Operand, *},
+};
 use std::{collections::VecDeque, default};
 
 struct Vm {
@@ -48,8 +53,8 @@ impl Vm {
                     self.stack.pop_front();
                 }
                 Instruction::Push => {
-                    let v = self.nextToken().get_data().unwrap();
-                    self.stack.push_front(Token::Data(v));
+                    let v = self.nextToken().try_into().unwrap();
+                    self.stack.push_front(data!(v));
                 }
                 Instruction::Dup => {
                     assert!(self.stack.len() >= 1);
@@ -58,48 +63,48 @@ impl Vm {
                     self.stack.push_front(v);
                 }
                 Instruction::Jmp => {
-                    let v = self.nextToken().get_data().unwrap();
-                    self.ip = v as usize;
+                    let v: Operand = self.nextToken().try_into().unwrap();
+                    self.ip = v.try_into().unwrap();
                 }
                 Instruction::Jif => {
                     assert!(self.stack.len() >= 1);
-                    let c = self.stack.pop_front().unwrap().vto_bool().unwrap();
-                    let d1 = self.nextToken().get_data().unwrap();
+                    let c = self.stack.pop_front().unwrap();
+                    let d1: Operand = self.nextToken().try_into().unwrap();
 
-                    if c {
-                        self.ip = d1 as usize;
+                    if c.try_into().unwrap() {
+                        self.ip = d1.try_into().unwrap();
                     }
                 }
 
                 Instruction::Not => {
                     assert!(self.stack.len() >= 1);
-                    let v1 = self.stack.pop_front().unwrap().vto_bool().unwrap();
-                    let r = match v1 {
-                        true => Token::v_false(),
-                        false => Token::v_true(),
+                    let v1 = self.stack.pop_front().unwrap();
+                    let r = match v1.try_into().unwrap() {
+                        true => tbool!(false),
+                        false => tbool!(true),
                     };
                     self.stack.push_front(r);
                 }
                 Instruction::Load => {
-                    let v1 = self.nextToken().get_data().unwrap();
-                    let var = self.current_frame().get(v1);
+                    let v1: Operand = self.nextToken().try_into().unwrap();
+                    let var = self.current_frame().get(v1.try_into().unwrap());
 
                     self.stack.push_front(Token::Data(var));
                 }
 
                 Instruction::Store => {
                     assert!(self.stack.len() >= 1);
-                    let var = self.nextToken().get_data().unwrap();
-                    let val = self.stack.pop_front().unwrap().get_data().unwrap();
-                    self.current_frame_mut().set(var, val);
+                    let var: Operand = self.nextToken().try_into().unwrap();
+                    let val = self.stack.pop_front().unwrap().try_into().unwrap();
+                    self.current_frame_mut().set(var.try_into().unwrap(), val);
                 }
 
                 Instruction::Call => {
-                    let address = self.nextToken().get_data().unwrap();
-                    assert!(address > 0 && address < self.program.len().try_into().unwrap());
+                    let address: Operand = self.nextToken().try_into().unwrap();
+                    assert!(address > 0 && address < self.program.len());
                     self.frames.push_front(Frame::new(self.ip));
 
-                    self.ip = address as usize;
+                    self.ip = address.try_into().unwrap();
                 }
                 Instruction::Ret => {
                     assert!(self.frames.len() > 1);
@@ -124,9 +129,9 @@ impl Vm {
                 | Instruction::Isge
                 | Instruction::Isgt => {
                     assert!(self.stack.len() >= 2);
-                    let d1 = self.stack.pop_front().unwrap().get_data().unwrap();
-                    let d2 = self.stack.pop_front().unwrap().get_data().unwrap();
-                    let r = Vm::execute_binary(i, d2, d1);
+                    let d2 = self.stack.pop_front().unwrap().try_into().unwrap();
+                    let d1 = self.stack.pop_front().unwrap().try_into().unwrap();
+                    let r = Vm::execute_binary(i, d1, d2);
                     self.stack.push_front(Token::Data(r));
                 }
             },
@@ -140,8 +145,8 @@ impl Vm {
             Instruction::Sub => d1 - d2,
             Instruction::Mul => d1 * d2,
             Instruction::Div => d1 / d2,
-            Instruction::And => (Token::to_bool(d1) && Token::to_bool(d2)).into(),
-            Instruction::Or => (Token::to_bool(d1) || Token::to_bool(d2)).into(),
+            Instruction::And => d1 & d2,
+            Instruction::Or => d1 | d2,
             Instruction::Isgt => (d1 > d2).into(),
             Instruction::Isge => (d1 >= d2).into(),
             Instruction::Iseq => (d1 == d2).into(),
@@ -173,51 +178,51 @@ impl Vm {
 mod test {
     use std::collections::VecDeque;
 
-    use crate::{instruction::*, num, stack};
+    use crate::{data, int, stack, tbool, tint, token::instruction::*, tstr};
 
     use super::Vm;
 
     #[test]
     fn push_halt() {
-        let mut vm = Vm::new(vec![PUSH, num!(10), PUSH, num!(12), HALT]);
+        let mut vm = Vm::new(vec![PUSH, tint!(10), PUSH, tint!(12), HALT]);
         vm.run();
         assert_eq!(vm.ip, 5);
         assert!(vm.halted);
 
-        assert_eq!(vm.stack, stack!(num![12], num![10]));
+        assert_eq!(vm.stack, stack![tint!(12), tint!(10)]);
     }
     #[test]
     fn add() {
-        let mut vm = Vm::new(vec![PUSH, num!(10), PUSH, num!(12), ADD, HALT]);
+        let mut vm = Vm::new(vec![PUSH, tint!(10), PUSH, tint!(12), ADD, HALT]);
         vm.run();
         assert_eq!(vm.ip, 6);
         assert!(vm.halted);
-        assert_eq!(vm.stack, stack![num!(22)]);
+        assert_eq!(vm.stack, stack![tint!(22)]);
     }
 
     #[test]
     fn sub() {
-        let mut vm = Vm::new(vec![PUSH, num!(10), PUSH, num!(12), SUB, HALT]);
+        let mut vm = Vm::new(vec![PUSH, tint!(10), PUSH, tint!(12), SUB, HALT]);
         vm.run();
         assert_eq!(vm.ip, 6);
         assert!(vm.halted);
-        assert_eq!(vm.stack, stack![num!(-2)]);
+        assert_eq!(vm.stack, stack![tint!(-2)]);
     }
     #[test]
     fn mul() {
-        let mut vm = Vm::new(vec![PUSH, num!(10), PUSH, num!(12), MUL, HALT]);
+        let mut vm = Vm::new(vec![PUSH, tint!(10), PUSH, tint!(12), MUL, HALT]);
         vm.run();
         assert_eq!(vm.ip, 6);
         assert!(vm.halted);
-        assert_eq!(vm.stack, stack![num!(120)]);
+        assert_eq!(vm.stack, stack![tint!(120)]);
     }
     #[test]
     fn divide() {
-        let mut vm = Vm::new(vec![PUSH, num!(20), PUSH, num!(2), DIV, HALT]);
+        let mut vm = Vm::new(vec![PUSH, tint!(20), PUSH, tint!(2), DIV, HALT]);
         vm.run();
         assert_eq!(vm.ip, 6);
         assert!(vm.halted);
-        assert_eq!(vm.stack, stack![num!(10)]);
+        assert_eq!(vm.stack, stack![tint!(10)]);
     }
     #[test]
     #[should_panic]
@@ -232,37 +237,37 @@ mod test {
 
         let mut vm = Vm::new(vec![
             PUSH,
-            num!(1),
+            tint!(1),
             PUSH,
-            num!(2),
+            tint!(2),
             PUSH,
-            num!(3),
+            tint!(3),
             MUL,
             ADD,
             PUSH,
-            num!(7),
+            tint!(7),
             DIV,
             HALT,
         ]);
         vm.run();
         assert_eq!(vm.ip, 12);
         assert!(vm.halted);
-        assert_eq!(vm.stack, stack![num!(1)]);
+        assert_eq!(vm.stack, stack![tint!(1)]);
     }
 
     #[test]
     fn test_not() {
-        let mut vm = Vm::new(vec![PUSH, num!(1), NOT, HALT]);
+        let mut vm = Vm::new(vec![PUSH, tbool!(true), NOT, HALT]);
         vm.run();
         assert!(vm.halted);
         assert_eq!(vm.ip, 4);
-        assert_eq!(vm.stack, stack![num!(0)]);
+        assert_eq!(vm.stack, stack![tbool!(false)]);
 
-        let mut vm = Vm::new(vec![PUSH, num!(0), NOT, HALT]);
+        let mut vm = Vm::new(vec![PUSH, tbool!(false), NOT, HALT]);
         vm.run();
         assert!(vm.halted);
         assert_eq!(vm.ip, 4);
-        assert_eq!(vm.stack, stack![num!(1)]);
+        assert_eq!(vm.stack, stack![tbool!(true)]);
     }
 
     #[test]
@@ -274,25 +279,25 @@ mod test {
 
     #[test]
     fn test_and_true() {
-        let mut vm = Vm::new(vec![PUSH, num!(1), PUSH, num!(1), AND, HALT]);
+        let mut vm = Vm::new(vec![PUSH, tbool!(true), PUSH, tbool!(true), AND, HALT]);
         vm.run();
         assert!(vm.halted);
         assert_eq!(vm.ip, 6);
-        assert_eq!(vm.stack, stack![num!(1)]);
+        assert_eq!(vm.stack, stack![tbool!(true)]);
     }
 
     #[test]
     fn test_or() {
-        let mut vm = Vm::new(vec![PUSH, num!(1), PUSH, num!(0), OR, HALT]);
+        let mut vm = Vm::new(vec![PUSH, tbool!(true), PUSH, tbool!(false), OR, HALT]);
         vm.run();
         assert!(vm.halted);
         assert_eq!(vm.ip, 6);
-        assert_eq!(vm.stack, stack![num!(1)]);
+        assert_eq!(vm.stack, stack![tbool!(true)]);
     }
 
     #[test]
     fn test_pop() {
-        let mut vm = Vm::new(vec![PUSH, num!(1), POP, HALT]);
+        let mut vm = Vm::new(vec![PUSH, tint!(1), POP, HALT]);
         vm.run();
         assert!(vm.halted);
         assert_eq!(vm.ip, 4);
@@ -307,61 +312,61 @@ mod test {
 
     #[test]
     fn test_dup() {
-        let mut vm = Vm::new(vec![PUSH, num!(1), DUP, HALT]);
+        let mut vm = Vm::new(vec![PUSH, tint!(1), DUP, HALT]);
         vm.run();
         assert!(vm.halted);
         assert_eq!(vm.ip, 4);
-        assert_eq!(vm.stack, stack![num!(1), num!(1)]);
+        assert_eq!(vm.stack, stack![tint!(1), tint!(1)]);
     }
 
     #[test]
     fn test_is_greater() {
-        let mut vm = Vm::new(vec![PUSH, num!(1), PUSH, num!(2), ISGT, HALT]);
+        let mut vm = Vm::new(vec![PUSH, tint!(1), PUSH, tint!(2), ISGT, HALT]);
         vm.run();
         assert!(vm.halted);
         assert_eq!(vm.ip, 6);
-        assert_eq!(vm.stack, stack![num!(0)]);
+        assert_eq!(vm.stack, stack![tbool!(false)]);
 
-        let mut vm = Vm::new(vec![PUSH, num!(2), PUSH, num!(1), ISGT, HALT]);
+        let mut vm = Vm::new(vec![PUSH, tint!(2), PUSH, tint!(1), ISGT, HALT]);
         vm.run();
         assert!(vm.halted);
         assert_eq!(vm.ip, 6);
-        assert_eq!(vm.stack, stack![num!(1)]);
+        assert_eq!(vm.stack, stack![tbool!(true)]);
     }
 
     #[test]
     fn test_is_greater_eq() {
-        let mut vm = Vm::new(vec![PUSH, num!(1), PUSH, num!(1), ISGE, HALT]);
+        let mut vm = Vm::new(vec![PUSH, tint!(3), PUSH, tint!(2), ISGE, HALT]);
         vm.run();
         assert!(vm.halted);
         assert_eq!(vm.ip, 6);
-        assert_eq!(vm.stack, stack![num!(1)]);
+        assert_eq!(vm.stack, stack![tbool!(true)]);
 
-        let mut vm = Vm::new(vec![PUSH, num!(2), PUSH, num!(1), ISGE, HALT]);
+        let mut vm = Vm::new(vec![PUSH, tint!(2), PUSH, tint!(1), ISGE, HALT]);
         vm.run();
         assert!(vm.halted);
         assert_eq!(vm.ip, 6);
-        assert_eq!(vm.stack, stack![num!(1)]);
+        assert_eq!(vm.stack, stack![tbool!(true)]);
     }
 
     #[test]
     fn test_is_eq() {
-        let mut vm = Vm::new(vec![PUSH, num!(1), PUSH, num!(1), ISEQ, HALT]);
+        let mut vm = Vm::new(vec![PUSH, tint!(1), PUSH, tint!(1), ISEQ, HALT]);
         vm.run();
         assert!(vm.halted);
         assert_eq!(vm.ip, 6);
-        assert_eq!(vm.stack, stack![num!(1)]);
+        assert_eq!(vm.stack, stack![tbool!(true)]);
 
-        let mut vm = Vm::new(vec![PUSH, num!(2), PUSH, num!(1), ISEQ, HALT]);
+        let mut vm = Vm::new(vec![PUSH, tint!(2), PUSH, tint!(1), ISEQ, HALT]);
         vm.run();
         assert!(vm.halted);
         assert_eq!(vm.ip, 6);
-        assert_eq!(vm.stack, stack![num!(0)]);
+        assert_eq!(vm.stack, stack![tbool!(false)]);
     }
 
     #[test]
     fn test_jump() {
-        let mut vm = Vm::new(vec![JMP, num!(3), HALT, JMP, num!(2)]);
+        let mut vm = Vm::new(vec![JMP, tint!(3), HALT, JMP, tint!(2)]);
         vm.run();
         assert!(vm.halted);
         assert_eq!(vm.ip, 3);
@@ -371,14 +376,14 @@ mod test {
     fn test_jump_conditional() {
         let mut vm = Vm::new(vec![
             PUSH,
-            num!(1),
+            tbool!(true),
             JIF,
-            num!(5),
+            tint!(5),
             POP,
             PUSH,
-            num!(0),
+            tbool!(false),
             JIF,
-            num!(4),
+            tint!(4),
             HALT,
         ]);
         vm.run();
@@ -388,14 +393,14 @@ mod test {
 
     #[test]
     fn test_load() {
-        let mut vm = Vm::new(vec![LOAD, num!(0), HALT]);
+        let mut vm = Vm::new(vec![LOAD, tstr!(String::from("a")), HALT]);
         vm.run();
         assert!(vm.halted);
         assert_eq!(vm.ip, 3);
     }
     #[test]
     fn test_store() {
-        let mut vm = Vm::new(vec![PUSH, num!(42), STORE, num!(0), HALT]);
+        let mut vm = Vm::new(vec![PUSH, tint!(42), STORE, tstr!(String::from("a")), HALT]);
         vm.run();
         assert!(vm.halted);
         assert_eq!(vm.ip, 5);
@@ -405,12 +410,20 @@ mod test {
 
     #[test]
     fn test_store_and_load() {
-        let mut vm = Vm::new(vec![PUSH, num!(42), STORE, num!(0), LOAD, num!(0), HALT]);
+        let mut vm = Vm::new(vec![
+            PUSH,
+            tint!(42),
+            STORE,
+            tstr!(String::from("a")),
+            LOAD,
+            tstr!(String::from("a")),
+            HALT,
+        ]);
         vm.run();
         assert!(vm.halted);
         assert_eq!(vm.ip, 7);
         assert_eq!(vm.current_frame().values(), vec![42]);
-        assert_eq!(vm.stack, stack![num!(42)]);
+        assert_eq!(vm.stack, stack![tint!(42)]);
     }
 
     #[test]
@@ -430,7 +443,7 @@ mod test {
     #[test]
     #[should_panic]
     fn test_store_panic2() {
-        let mut vm = Vm::new(vec![STORE, num!(0), HALT]);
+        let mut vm = Vm::new(vec![STORE, tint!(0), HALT]);
         vm.run();
     }
     #[test]
@@ -445,51 +458,54 @@ mod test {
          *
          * We're going to use variable 0 as "a", variable 1 as "b", variable 2 as "c".
          */
+        let a = String::from("a");
+        let b = String::from("b");
+        let c = String::from("c");
         let mut vm = Vm::new(vec![
             // Init a with 6
             PUSH,
-            num!(6),
+            tint!(6),
             STORE,
-            num!(0),
+            tstr!(a.clone()),
             // Init b with 4
             PUSH,
-            num!(4),
+            tint!(4),
             STORE,
-            num!(1),
+            tstr!(b.clone()),
             // Load a and b on stack
             LOAD,
-            num!(0), // Stack contains a
+            tstr!(a.clone()), // Stack contains a
             LOAD,
-            num!(1), // Stack contains b
-            ISGT,    // Stack contains a > b
+            tstr!(b.clone()), // Stack contains b
+            ISGT,             // Stack contains a > b
             JIF,
-            num!(21),
+            tint!(21),
             // Else path
             LOAD,
-            num!(1), // Stack contains b
+            tstr!(b.clone()), // Stack contains b
             STORE,
-            num!(2), // Set c to the stack based head c = b
+            tstr!(c.clone()), // Set c to the stack based head c = b
             JMP,
-            num!(25),
+            tint!(25),
             // This is the if path and address is 21
             LOAD,
-            num!(0),
+            tstr!(a.clone()),
             STORE, // Set c to the stack head meaning c = a
-            num!(2),
+            tstr!(c.clone()),
             // Done, this is address 25
             HALT,
         ]);
         vm.run();
         assert!(vm.halted);
         assert!(vm.stack.is_empty());
-        assert_eq!(vm.current_frame().get(0), 6);
-        assert_eq!(vm.current_frame().get(1), 4);
-        assert_eq!(vm.current_frame().get(2), 6);
+        assert_eq!(vm.current_frame().get(a), 6);
+        assert_eq!(vm.current_frame().get(b), 4);
+        assert_eq!(vm.current_frame().get(c), 6);
     }
 
     #[test]
     fn test_func_no_arguments_no_return() {
-        let mut vm = Vm::new(vec![CALL, num!(3), HALT, RET]);
+        let mut vm = Vm::new(vec![CALL, tint!(3), HALT, RET]);
         vm.run();
         assert!(vm.halted);
         assert_eq!(vm.ip, 3);
@@ -498,30 +514,30 @@ mod test {
 
     #[test]
     fn test_func_no_arguments_with_return() {
-        let mut vm = Vm::new(vec![CALL, num!(3), HALT, PUSH, num!(7), RET]);
+        let mut vm = Vm::new(vec![CALL, tint!(3), HALT, PUSH, tint!(7), RET]);
         vm.run();
         assert!(vm.halted);
         assert_eq!(vm.ip, 3);
-        assert_eq!(vm.stack, stack![num!(7)]);
+        assert_eq!(vm.stack, stack![tint!(7)]);
     }
 
     #[test]
     fn test_func_with_arguments_return() {
         let mut vm = Vm::new(vec![
             PUSH,
-            num!(3),
+            tint!(3),
             CALL,
-            num!(5),
+            tint!(5),
             HALT,
             PUSH,
-            num!(2),
+            tint!(2),
             MUL,
             RET,
         ]);
         vm.run();
         assert!(vm.halted);
         assert_eq!(vm.ip, 5);
-        assert_eq!(vm.stack, stack![num!(6)]);
+        assert_eq!(vm.stack, stack![tint!(6)]);
     }
 
     /*
@@ -533,45 +549,46 @@ mod test {
      *     }
      * }
      */
-
     #[test]
     fn test_max_ab() {
+        let a = String::from("a");
+        let b = String::from("b");
         let mut vm = Vm::new(vec![
             PUSH,
-            num!(6), // First argument
+            tint!(6), // First argument
             PUSH,
-            num!(4), // Second argument
+            tint!(4), // Second argument
             CALL,
-            num!(7), // Call the func
+            tint!(7), // Call the func
             HALT,
-            STORE,   // 7th instruction
-            num!(1), // store b
+            STORE,            // 7th instruction
+            tstr!(b.clone()), // store b
             STORE,
-            num!(0), // store a
+            tstr!(a.clone()), // store a
             LOAD,
-            num!(0),
+            tstr!(a.clone()),
             LOAD,
-            num!(1),
+            tstr!(b.clone()),
             ISGE,
             JIF,
-            num!(21), // 17
+            tint!(21), // 17
             LOAD,
-            num!(1),
+            tstr!(b.clone()),
             RET,
             LOAD, //21
-            num!(0),
+            tstr!(a.clone()),
             RET,
         ]);
         vm.run();
         assert!(vm.halted);
         assert_eq!(vm.ip, 7);
-        assert_eq!(vm.stack, stack![num!(6)]);
+        assert_eq!(vm.stack, stack![tint!(6)]);
     }
 
     #[test]
     // Run the test with --nocapture to see the output.
     fn test_write_stdout() {
-        let mut vm = Vm::new(vec![PUSH, num!(3), WRITE, HALT]);
+        let mut vm = Vm::new(vec![PUSH, tint!(3), WRITE, HALT]);
         vm.run();
         assert!(vm.halted);
         assert_eq!(vm.ip, 4);

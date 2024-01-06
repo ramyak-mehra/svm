@@ -1,10 +1,10 @@
 use std::collections::HashMap;
 
-use crate::instruction::Operand;
+use crate::token::operand::Operand;
 
 #[derive(Debug, Default)]
 pub struct Frame {
-    variables: HashMap<i64, Operand>,
+    variables: HashMap<String, Operand>, // TODO(optimization): Use usize for key
     return_address: usize,
 }
 
@@ -18,17 +18,18 @@ impl Frame {
     pub fn return_address(&self) -> usize {
         self.return_address
     }
-    pub fn get(&self, var: i64) -> Operand {
+    pub fn get(&self, var: String) -> Operand {
         match self.variables.get(&var) {
-            Some(v) => *v,
-            None => 0,
+            Some(v) => v.clone(),
+            None => Operand::Null,
         }
     }
 
-    pub fn set(&mut self, var: i64, val: Operand) {
+    pub fn set(&mut self, var: String, val: Operand) {
         self.variables.insert(var, val);
     }
+
     pub fn values(&self) -> Vec<Operand> {
-        self.variables.values().map(|v| *v).collect()
+        self.variables.values().map(|v| v.clone()).collect()
     }
 }
